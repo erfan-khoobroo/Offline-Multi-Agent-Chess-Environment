@@ -1,6 +1,8 @@
 
 import pygame
 import chess
+import math
+import random
 from pathlib import Path
 
 import arabic_reshaper
@@ -20,7 +22,12 @@ SQUARE_SIZE = BOARD_SIZE // 8
 PANEL_WIDTH = 260
 WINDOW_WIDTH = BOARD_SIZE + PANEL_WIDTH
 WINDOW_HEIGHT = 700
-AGENT_MOVE_INTERVAL_MS = 900
+AGENT_MOVE_MIN_MS = 3000
+AGENT_MOVE_MAX_MS = 6000
+
+
+def next_agent_move_delay():
+    return random.randint(AGENT_MOVE_MIN_MS, AGENT_MOVE_MAX_MS)
 
 LIGHT_SQUARE = (240, 217, 181)
 DARK_SQUARE = (181, 136, 99)
@@ -529,14 +536,63 @@ def draw_board(screen, engine, selected, font, last_move=None):
                         4
                     )
 
-            piece = engine.piece_at(square)
-
-            draw_piece(
-                screen,
-                piece,
-                rect,
-                font
+    # Draw the pieces after the board squares and markers.
+    for row in range(8):
+        for col in range(8):
+            square = chess.square(col, 7 - row)
+            rect = pygame.Rect(
+                col * SQUARE_SIZE,
+                row * SQUARE_SIZE,
+                SQUARE_SIZE,
+                SQUARE_SIZE,
             )
+            draw_piece(screen, engine.piece_at(square), rect, font)
+
+    if last_move is not None:
+        draw_move_arrow(screen, last_move)
+
+
+def draw_move_arrow(screen, move):
+    """Overlay a clear, translucent arrow for the most recent move."""
+    start = (
+        chess.square_file(move.from_square) * SQUARE_SIZE + SQUARE_SIZE // 2,
+        (7 - chess.square_rank(move.from_square)) * SQUARE_SIZE + SQUARE_SIZE // 2,
+    )
+    target = (
+        chess.square_file(move.to_square) * SQUARE_SIZE + SQUARE_SIZE // 2,
+        (7 - chess.square_rank(move.to_square)) * SQUARE_SIZE + SQUARE_SIZE // 2,
+    )
+    dx = target[0] - start[0]
+    dy = target[1] - start[1]
+    distance = math.hypot(dx, dy)
+    if distance == 0:
+        return
+
+    direction = (dx / distance, dy / distance)
+    tip = (
+        target[0] - direction[0] * 25,
+        target[1] - direction[1] * 25,
+    )
+    base = (
+        tip[0] - direction[0] * 18,
+        tip[1] - direction[1] * 18,
+    )
+    perpendicular = (-direction[1], direction[0])
+    wing = 12
+    arrowhead = [
+        (round(tip[0]), round(tip[1])),
+        (round(base[0] + perpendicular[0] * wing),
+         round(base[1] + perpendicular[1] * wing)),
+        (round(base[0] - perpendicular[0] * wing),
+         round(base[1] - perpendicular[1] * wing)),
+    ]
+
+    overlay = pygame.Surface((BOARD_SIZE, BOARD_SIZE), pygame.SRCALPHA)
+    pygame.draw.line(overlay, (10, 35, 48, 175), start, tip, 13)
+    pygame.draw.polygon(overlay, (10, 35, 48, 175), arrowhead)
+    pygame.draw.line(overlay, (55, 225, 190, 200), start, tip, 7)
+    pygame.draw.polygon(overlay, (55, 225, 190, 220), arrowhead)
+    screen.blit(overlay, (0, 0))
 
 
 # ==========================================
@@ -722,6 +778,9 @@ def play_game(screen, clock, player_types):
                 player_type
             )
 
+    if player_types[engine.board.turn] != "Human":
+        next_agent_move_at = pygame.time.get_ticks() + next_agent_move_delay()
+
     while True:
 
         for event in pygame.event.get():
@@ -743,7 +802,11 @@ def play_game(screen, clock, player_types):
 
                     selected_square = None
                     last_move = None
-                    next_agent_move_at = pygame.time.get_ticks() + AGENT_MOVE_INTERVAL_MS
+                    next_agent_move_at = (
+                        pygame.time.get_ticks() + next_agent_move_delay()
+                        if player_types[engine.board.turn] != "Human"
+                        else 0
+                    )
 
             # Human input
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -808,7 +871,7 @@ def play_game(screen, clock, player_types):
                         engine.make_move(move)
                         last_move = move
                         next_agent_move_at = (
-                            pygame.time.get_ticks() + AGENT_MOVE_INTERVAL_MS
+                            pygame.time.get_ticks() + next_agent_move_delay()
                         )
 
                         selected_square = None
@@ -842,7 +905,7 @@ def play_game(screen, clock, player_types):
                     engine.make_move(move)
                     last_move = move
                     next_agent_move_at = (
-                        pygame.time.get_ticks() + AGENT_MOVE_INTERVAL_MS
+                        pygame.time.get_ticks() + next_agent_move_delay()
                     )
 
                 selected_square = None
