@@ -4,6 +4,7 @@ import chess
 import math
 import random
 from pathlib import Path
+from functools import lru_cache
 
 import arabic_reshaper
 from bidi.algorithm import get_display
@@ -110,6 +111,7 @@ def draw_persian_text(screen, text, font, color, center):
 
     screen.blit(text_surface, text_rect)
 
+@lru_cache(maxsize=32)
 def get_font(size, bold=False):
 
     font_path = "fonts/Vazirmatn-Regular.ttf"
@@ -599,33 +601,56 @@ def draw_move_arrow(screen, move):
 # Game Status
 # ==========================================
 
-def get_status(engine):
-
+def get_status_info(engine):
     board = engine.board
 
     if engine.is_game_over():
-
         outcome = engine.outcome()
+        if outcome.winner is not None:
+            winner = "WHITE" if outcome.winner == chess.WHITE else "BLACK"
+            if outcome.termination == chess.Termination.CHECKMATE:
+                return "mate", f"{winner} WINS", "Checkmate", (235, 80, 80)
+            return "win", f"{winner} WINS", "Game complete", (83, 190, 135)
 
-        if outcome.winner is None:
-            return "Draw"
+        termination = outcome.termination.name if outcome else "DRAW"
+        draw_labels = {
+            "STALEMATE": ("STALEMATE", "No legal moves"),
+            "INSUFFICIENT_MATERIAL": ("DRAW", "Insufficient material"),
+            "FIFTY_MOVES": ("DRAW", "50-move rule"),
+            "SEVENTYFIVE_MOVES": ("DRAW", "75-move rule"),
+            "THREEFOLD_REPETITION": ("DRAW", "Position repeated"),
+            "FIVEFOLD_REPETITION": ("DRAW", "Position repeated"),
+            "VARIANT_DRAW": ("DRAW", "Lone-king limit"),
+        }
+        title, detail = draw_labels.get(termination, ("DRAW", "Game drawn"))
+        return "draw", title, detail, (225, 184, 83)
 
-        return (
-            "White wins"
-            if outcome.winner == chess.WHITE
-            else "Black wins"
-        )
-
-    turn = (
-        "White"
-        if board.turn == chess.WHITE
-        else "Black"
-    )
-
+    side = "WHITE" if board.turn == chess.WHITE else "BLACK"
     if board.is_check():
-        return turn + " to move - Check!"
+        return "check", "CHECK!", f"{side.title()} king is attacked", (238, 195, 66)
 
-    return turn + " to move"
+    return "turn", f"{side} TO MOVE", "Game in progress", (60, 205, 115)
+
+
+def draw_status_indicator(screen, center, color):
+    x, y = center
+    pygame.draw.circle(screen, tuple(channel // 3 for channel in color), center, 14)
+    pygame.draw.circle(screen, color, center, 9)
+    pygame.draw.circle(screen, (245, 248, 250), (x - 2, y - 3), 2)
+
+
+def draw_status_card(screen, rect, engine, font):
+    kind, title, detail, accent = get_status_info(engine)
+    pygame.draw.rect(screen, (53, 59, 72), rect, border_radius=12)
+    pygame.draw.rect(screen, accent, rect, width=2, border_radius=12)
+
+    icon_center = (rect.x + 28, rect.centery)
+    draw_status_indicator(screen, icon_center, accent)
+
+    title_font = get_font(14, True)
+    detail_font = get_font(12)
+    draw_text(screen, title, title_font, (248, 248, 250), rect.x + 55, rect.y + 22)
+    draw_text(screen, detail, detail_font, (194, 201, 212), rect.x + 55, rect.y + 47)
 
 
 # ==========================================
@@ -700,26 +725,15 @@ def draw_game_panel(screen, player_types, engine, font):
         2
     )
 
-    draw_text(
+    status_header_font = get_font(19, True)
+    draw_text(screen, "TURN STATUS", status_header_font, (15, 19, 27), panel_x + 27, 338)
+    draw_text(screen, "TURN STATUS", status_header_font, (255, 255, 255), panel_x + 25, 335)
+
+    draw_status_card(
         screen,
-        "STATUS",
+        pygame.Rect(panel_x + 15, 370, PANEL_WIDTH - 30, 82),
+        engine,
         font,
-        (255, 255, 255),
-        panel_x + 25,
-        335
-    )
-
-    status = get_status(engine)
-
-    status_image = font.render(
-        status,
-        True,
-        (245, 205, 100)
-    )
-
-    screen.blit(
-        status_image,
-        (panel_x + 25, 375)
     )
 
     draw_text(
