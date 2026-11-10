@@ -354,7 +354,7 @@ def run_menu(screen, clock):
 
         draw_text(
             screen,
-            "Use the arrows to choose players",
+            "Choose players",
             hint_font,
             (170, 180, 195),
             padding + 4,
