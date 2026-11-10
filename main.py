@@ -23,6 +23,9 @@ SQUARE_SIZE = BOARD_SIZE // 8
 PANEL_WIDTH = 260
 WINDOW_WIDTH = BOARD_SIZE + PANEL_WIDTH
 WINDOW_HEIGHT = 700
+BOARD_TOP = 0
+UI_SCALE = 1.0
+PANEL_CONTENT_WIDTH = PANEL_WIDTH
 AGENT_MOVE_MIN_MS = 2000
 AGENT_MOVE_MAX_MS = 4000
 
@@ -486,7 +489,7 @@ def draw_board(screen, engine, selected, font, last_move=None):
 
             rect = pygame.Rect(
                 col * SQUARE_SIZE,
-                row * SQUARE_SIZE,
+                BOARD_TOP + row * SQUARE_SIZE,
                 SQUARE_SIZE,
                 SQUARE_SIZE
             )
@@ -544,7 +547,7 @@ def draw_board(screen, engine, selected, font, last_move=None):
             square = chess.square(col, 7 - row)
             rect = pygame.Rect(
                 col * SQUARE_SIZE,
-                row * SQUARE_SIZE,
+                BOARD_TOP + row * SQUARE_SIZE,
                 SQUARE_SIZE,
                 SQUARE_SIZE,
             )
@@ -571,16 +574,14 @@ def draw_move_arrow(screen, move):
         return
 
     direction = (dx / distance, dy / distance)
-    tip = (
-        target[0] - direction[0] * 25,
-        target[1] - direction[1] * 25,
-    )
+    tip = (target[0] - direction[0] * 25 * UI_SCALE,
+           target[1] - direction[1] * 25 * UI_SCALE)
     base = (
-        tip[0] - direction[0] * 18,
-        tip[1] - direction[1] * 18,
+        tip[0] - direction[0] * 18 * UI_SCALE,
+        tip[1] - direction[1] * 18 * UI_SCALE,
     )
     perpendicular = (-direction[1], direction[0])
-    wing = 12
+    wing = 12 * UI_SCALE
     arrowhead = [
         (round(tip[0]), round(tip[1])),
         (round(base[0] + perpendicular[0] * wing),
@@ -590,11 +591,11 @@ def draw_move_arrow(screen, move):
     ]
 
     overlay = pygame.Surface((BOARD_SIZE, BOARD_SIZE), pygame.SRCALPHA)
-    pygame.draw.line(overlay, (10, 35, 48, 175), start, tip, 13)
+    pygame.draw.line(overlay, (10, 35, 48, 175), start, tip, max(5, round(13 * UI_SCALE)))
     pygame.draw.polygon(overlay, (10, 35, 48, 175), arrowhead)
-    pygame.draw.line(overlay, (55, 225, 190, 200), start, tip, 7)
+    pygame.draw.line(overlay, (55, 225, 190, 200), start, tip, max(3, round(7 * UI_SCALE)))
     pygame.draw.polygon(overlay, (55, 225, 190, 220), arrowhead)
-    screen.blit(overlay, (0, 0))
+    screen.blit(overlay, (0, BOARD_TOP))
 
 
 # ==========================================
@@ -634,9 +635,12 @@ def get_status_info(engine):
 
 def draw_status_indicator(screen, center, color):
     x, y = center
-    pygame.draw.circle(screen, tuple(channel // 3 for channel in color), center, 14)
-    pygame.draw.circle(screen, color, center, 9)
-    pygame.draw.circle(screen, (245, 248, 250), (x - 2, y - 3), 2)
+    radius = max(10, round(14 * UI_SCALE))
+    pygame.draw.circle(screen, tuple(channel // 3 for channel in color), center, radius)
+    pygame.draw.circle(screen, color, center, max(6, round(9 * UI_SCALE)))
+    pygame.draw.circle(screen, (245, 248, 250), (x - max(1, round(2 * UI_SCALE)),
+                                                  y - max(1, round(3 * UI_SCALE))),
+                       max(1, round(2 * UI_SCALE)))
 
 
 def draw_status_card(screen, rect, engine, font):
@@ -644,13 +648,14 @@ def draw_status_card(screen, rect, engine, font):
     pygame.draw.rect(screen, (53, 59, 72), rect, border_radius=12)
     pygame.draw.rect(screen, accent, rect, width=2, border_radius=12)
 
-    icon_center = (rect.x + 28, rect.centery)
+    icon_center = (rect.x + round(28 * UI_SCALE), rect.centery)
     draw_status_indicator(screen, icon_center, accent)
 
-    title_font = get_font(14, True)
-    detail_font = get_font(12)
-    draw_text(screen, title, title_font, (248, 248, 250), rect.x + 55, rect.y + 22)
-    draw_text(screen, detail, detail_font, (194, 201, 212), rect.x + 55, rect.y + 47)
+    title_font = get_font(max(12, round(14 * UI_SCALE)), True)
+    detail_font = get_font(max(10, round(12 * UI_SCALE)))
+    text_x = rect.x + round(55 * UI_SCALE)
+    draw_text(screen, title, title_font, (248, 248, 250), text_x, rect.y + round(22 * UI_SCALE))
+    draw_text(screen, detail, detail_font, (194, 201, 212), text_x, rect.y + round(47 * UI_SCALE))
 
 
 # ==========================================
@@ -658,113 +663,61 @@ def draw_status_card(screen, rect, engine, font):
 # ==========================================
 
 def draw_game_panel(screen, player_types, engine, font):
-
-    panel_x = BOARD_SIZE
-
     pygame.draw.rect(
         screen,
         PANEL_COLOR,
-        pygame.Rect(
-            panel_x,
-            0,
-            PANEL_WIDTH,
-            WINDOW_HEIGHT
-        )
+        pygame.Rect(BOARD_SIZE, 0, PANEL_WIDTH, WINDOW_HEIGHT),
     )
 
-    draw_text(
-        screen,
-        "GAME INFO",
-        font,
-        (255, 255, 255),
-        panel_x + 25,
-        35
-    )
+    scale = UI_SCALE
+    panel_x = BOARD_SIZE + (PANEL_WIDTH - PANEL_CONTENT_WIDTH) // 2
+    panel_right = panel_x + PANEL_CONTENT_WIDTH
 
-    draw_text(
-        screen,
-        "WHITE",
-        font,
-        (230, 230, 230),
-        panel_x + 25,
-        105
-    )
+    def px(value):
+        return round(value * scale)
 
-    draw_text(
-        screen,
-        player_types[chess.WHITE],
-        font,
-        (120, 210, 160),
-        panel_x + 25,
-        140
-    )
-
-    draw_text(
-        screen,
-        "BLACK",
-        font,
-        (230, 230, 230),
-        panel_x + 25,
-        205
-    )
-
-    draw_text(
-        screen,
-        player_types[chess.BLACK],
-        font,
-        (120, 210, 160),
-        panel_x + 25,
-        240
-    )
+    draw_text(screen, "GAME INFO", font, (255, 255, 255), panel_x + px(25), px(35))
+    draw_text(screen, "WHITE", font, (230, 230, 230), panel_x + px(25), px(105))
+    draw_text(screen, player_types[chess.WHITE], font, (120, 210, 160),
+              panel_x + px(25), px(140))
+    draw_text(screen, "BLACK", font, (230, 230, 230), panel_x + px(25), px(205))
+    draw_text(screen, player_types[chess.BLACK], font, (120, 210, 160),
+              panel_x + px(25), px(240))
 
     pygame.draw.line(
         screen,
         (90, 95, 110),
-        (panel_x + 20, 300),
-        (WINDOW_WIDTH - 20, 300),
-        2
+        (panel_x + px(20), px(300)),
+        (panel_right - px(20), px(300)),
+        max(1, px(2)),
     )
 
-    status_header_font = get_font(19, True)
-    draw_text(screen, "TURN STATUS", status_header_font, (15, 19, 27), panel_x + 27, 338)
-    draw_text(screen, "TURN STATUS", status_header_font, (255, 255, 255), panel_x + 25, 335)
+    status_header_font = get_font(max(15, px(19)), True)
+    draw_text(screen, "TURN STATUS", status_header_font, (15, 19, 27),
+              panel_x + px(27), px(338))
+    draw_text(screen, "TURN STATUS", status_header_font, (255, 255, 255),
+              panel_x + px(25), px(335))
 
+    card_padding = px(15)
     draw_status_card(
         screen,
-        pygame.Rect(panel_x + 15, 370, PANEL_WIDTH - 30, 82),
+        pygame.Rect(
+            panel_x + card_padding,
+            px(370),
+            max(180, PANEL_CONTENT_WIDTH - 2 * card_padding),
+            px(82),
+        ),
         engine,
         font,
     )
 
-    draw_text(
-        screen,
-        "R : Restart",
-        font,
-        (190, 190, 200),
-        panel_x + 25,
-        480
-    )
+    draw_text(screen, "R : Restart", font, (190, 190, 200),
+              panel_x + px(25), px(480))
+    draw_text(screen, "M : Main Menu", font, (190, 190, 200),
+              panel_x + px(25), px(520))
+    draw_text(screen, "ESC : Exit", font, (190, 190, 200),
+              panel_x + px(25), px(560))
 
-    draw_text(
-        screen,
-        "M : Main Menu",
-        font,
-        (190, 190, 200),
-        panel_x + 25,
-        520
-    )
-
-    draw_text(
-        screen,
-        "ESC : Exit",
-        font,
-        (190, 190, 200),
-        panel_x + 25,
-        560
-    )
-
-
-# ==========================================
 # Game Loop
 # ==========================================
 
@@ -776,8 +729,8 @@ def play_game(screen, clock, player_types):
     last_move = None
     next_agent_move_at = 0
 
-    piece_font = get_font(30, True)
-    info_font = get_font(18)
+    piece_font = get_font(max(18, round(30 * UI_SCALE)), True)
+    info_font = get_font(max(14, round(18 * UI_SCALE)))
 
     # Create selected agents
     agents = {}
@@ -838,11 +791,12 @@ def play_game(screen, clock, player_types):
 
                 x, y = event.pos
 
-                if x >= BOARD_SIZE or y >= BOARD_SIZE:
+                if (x >= BOARD_SIZE or y < BOARD_TOP
+                        or y >= BOARD_TOP + BOARD_SIZE):
                     continue
 
                 col = x // SQUARE_SIZE
-                row = y // SQUARE_SIZE
+                row = (y - BOARD_TOP) // SQUARE_SIZE
 
                 clicked_square = chess.square(
                     col,
@@ -953,10 +907,29 @@ def play_game(screen, clock, player_types):
 
 def main():
 
+    global BOARD_SIZE, SQUARE_SIZE, PANEL_WIDTH, WINDOW_WIDTH, WINDOW_HEIGHT
+    global BOARD_TOP, UI_SCALE, PANEL_CONTENT_WIDTH
+
     pygame.init()
 
     screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-    WIDTH, HEIGHT = screen.get_size()
+    screen_width, screen_height = screen.get_size()
+
+    # Keep chess squares square, fill the display height, and give the
+    # remaining horizontal space to the information panel.
+    board_limit = min(screen_height, int(screen_width * 0.68))
+    SQUARE_SIZE = max(1, board_limit // 8)
+    BOARD_SIZE = SQUARE_SIZE * 8
+    PANEL_WIDTH = screen_width - BOARD_SIZE
+    WINDOW_WIDTH = screen_width
+    WINDOW_HEIGHT = screen_height
+    BOARD_TOP = (screen_height - BOARD_SIZE) // 2
+    UI_SCALE = SQUARE_SIZE / 80
+    panel_padding = round(16 * UI_SCALE)
+    PANEL_CONTENT_WIDTH = min(
+        PANEL_WIDTH - 2 * panel_padding,
+        round(360 * UI_SCALE),
+    )
 
     pygame.display.set_caption(
         "Offline Multi-Agent Chess"
@@ -992,4 +965,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
