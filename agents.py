@@ -22,15 +22,21 @@ class BaseAgent:
     aggression_scale = 1.0
 
     def __init__(self, name):
-        """نام ایجنت را ذخیره می‌کند."""
+        """نام ایجنت و وضعیت انتخاب حرکت آغازین را مقداردهی می‌کند."""
         self.name = name
+        self._has_moved = False
 
     def choose_move(self, board):
-        """حرکت‌های قانونی را با Minimax و هرس آلفا–بتا مقایسه و یکی را انتخاب می‌کند."""
+        """حرکت نخست را تصادفی و حرکت‌های بعدی را با Minimax انتخاب می‌کند."""
         legal_moves = list(board.legal_moves)
         # اگر حرکت قانونی وجود نداشته باشد، ایجنت حرکتی برنمی‌گرداند.
         if not legal_moves:
             return None
+
+        # نخستین حرکت این ایجنت بدون ارزیابی موقعیت، تصادفی انتخاب می‌شود.
+        if not self._has_moved:
+            self._has_moved = True
+            return random.choice(legal_moves)
 
         perspective = board.turn
         best_score = float("-inf")
